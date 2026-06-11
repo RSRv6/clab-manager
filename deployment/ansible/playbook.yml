@@ -1,0 +1,93 @@
+---
+- name: Deploy VLM central
+  hosts: central_hosts
+  become: true
+  tasks:
+    - name: Ensure app user exists
+      ansible.builtin.user:
+        name: "{{ vlm_app_user }}"
+        shell: /bin/bash
+        create_home: true
+
+    - name: Install deployment script
+      ansible.builtin.copy:
+        src: ../scripts/vlm-deploy-update.sh
+        dest: /usr/local/bin/vlm-deploy-update.sh
+        mode: '0755'
+
+    - name: Install central environment file
+      ansible.builtin.template:
+        src: templates/vlm-central.env.j2
+        dest: /etc/default/vlm-central
+        mode: '0644'
+
+    - name: Install central systemd unit
+      ansible.builtin.template:
+        src: templates/vlm-central.service.j2
+        dest: /etc/systemd/system/{{ central_service_name }}.service
+        mode: '0644'
+
+    - name: Deploy or update central
+      ansible.builtin.command: >
+        /usr/local/bin/vlm-deploy-update.sh
+        --role central
+        --repo-url {{ vlm_repo_url }}
+        --branch {{ vlm_branch }}
+        --app-dir {{ vlm_app_dir }}
+        --app-user {{ vlm_app_user }}
+        --sync-mode {{ vlm_sync_mode }}
+        --service-name {{ central_service_name }}
+        --healthcheck-url {{ central_healthcheck_url }}
+      register: central_deploy
+      changed_when: true
+
+    - name: Show central deployment output
+      ansible.builtin.debug:
+        var: central_deploy.stdout_lines
+
+
+- name: Deploy VLM vm-agents
+  hosts: vm_agents
+  become: true
+  tasks:
+    - name: Ensure app user exists
+      ansible.builtin.user:
+        name: "{{ vlm_app_user }}"
+        shell: /bin/bash
+        create_home: true
+
+    - name: Install deployment script
+      ansible.builtin.copy:
+        src: ../scripts/vlm-deploy-update.sh
+        dest: /usr/local/bin/vlm-deploy-update.sh
+        mode: '0755'
+
+    - name: Install vm-agent environment file
+      ansible.builtin.template:
+        src: templates/vlm-agent.env.j2
+        dest: /etc/default/vlm-agent
+        mode: '0644'
+
+    - name: Install vm-agent systemd unit
+      ansible.builtin.template:
+        src: templates/vlm-agent.service.j2
+        dest: /etc/systemd/system/{{ agent_service_name }}.service
+        mode: '0644'
+
+    - name: Deploy or update vm-agent
+      ansible.builtin.command: >
+        /usr/local/bin/vlm-deploy-update.sh
+        --role agent
+        --repo-url {{ vlm_repo_url }}
+        --branch {{ vlm_branch }}
+        --app-dir {{ vlm_app_dir }}
+        --app-user {{ vlm_app_user }}
+        --sync-mode {{ vlm_sync_mode }}
+        --service-name {{ agent_service_name }}
+        --healthcheck-url {{ agent_healthcheck_url }}
+      register: agent_deploy
+      changed_when: true
+
+    - name: Show vm-agent deployment output
+      ansible.builtin.debug:
+        var: agent_deploy.stdout_lines

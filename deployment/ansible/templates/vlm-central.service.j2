@@ -1,0 +1,17 @@
+[Unit]
+Description=Virtual Labs Management - Central API
+After=network.target
+
+[Service]
+Type=simple
+User={{ vlm_app_user }}
+Group={{ vlm_app_user }}
+WorkingDirectory={{ vlm_app_dir }}/central
+EnvironmentFile=/etc/default/vlm-central
+ExecStart=/usr/bin/env bash {{ vlm_app_dir }}/central/scripts/start-central.sh
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

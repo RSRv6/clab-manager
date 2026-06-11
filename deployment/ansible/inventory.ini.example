@@ -1,0 +1,6 @@
+[central_hosts]
+central-01 ansible_host=192.168.56.10 ansible_user=ubuntu
+
+[vm_agents]
+vm-agent-01 ansible_host=192.168.56.21 ansible_user=ubuntu
+vm-agent-02 ansible_host=192.168.56.22 ansible_user=ubuntu

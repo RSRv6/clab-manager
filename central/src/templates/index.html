@@ -1,0 +1,1003 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VLM | Virtual Labs Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="/static/branding/favicon.svg" />
+    <link rel="stylesheet" href="/static/css/table-interactive.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/cytoscape@3.29.2/dist/cytoscape.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.js"></script>
+    <style>
+        #graph-panel:fullscreen,
+        #graph-panel:-webkit-full-screen,
+        #graph-panel:-moz-full-screen {
+            max-height: 100vh !important;
+            height: 100vh !important;
+            width: 100vw !important;
+            overflow: hidden !important;
+            background: #0f172a !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+        }
+
+        #graph-panel:fullscreen #cy-graph,
+        #graph-panel:-webkit-full-screen #cy-graph,
+        #graph-panel:-moz-full-screen #cy-graph {
+            width: 100% !important;
+            height: 100% !important;
+            min-height: 100% !important;
+        }
+
+        .doc-rich-editor .ql-toolbar.ql-snow {
+            border: 0;
+            border-bottom: 1px solid rgb(51 65 85);
+            background: rgb(15 23 42 / 0.9);
+        }
+
+        .doc-rich-editor .ql-container.ql-snow {
+            border: 0;
+            min-height: 180px;
+            color: rgb(226 232 240);
+        }
+
+        .doc-rich-editor .ql-editor {
+            min-height: 180px;
+            font-size: 12px;
+            color: rgb(226 232 240);
+        }
+
+        .doc-rich-editor .ql-snow .ql-stroke {
+            stroke: rgb(203 213 225);
+        }
+
+        .doc-rich-editor .ql-snow .ql-fill {
+            fill: rgb(203 213 225);
+        }
+
+        .doc-rich-editor .ql-snow .ql-picker,
+        .doc-rich-editor .ql-snow .ql-picker-label,
+        .doc-rich-editor .ql-snow .ql-picker-item {
+            color: rgb(203 213 225);
+        }
+
+        .doc-rich-editor .ql-snow .ql-picker-options {
+            background: rgb(15 23 42);
+            border-color: rgb(51 65 85);
+        }
+
+        .doc-rich-editor .ql-editor.ql-blank::before {
+            color: rgb(100 116 139);
+            font-style: normal;
+        }
+
+        #theme-toggle {
+            width: 2.5rem;
+            height: 2.5rem;
+            border: 1px solid rgb(71 85 105);
+            background: rgb(15 23 42 / 0.72);
+            color: rgb(226 232 240);
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+        }
+
+        #theme-toggle:hover {
+            background: rgb(30 41 59 / 0.95);
+            transform: translateY(-1px);
+        }
+
+        #theme-toggle svg {
+            width: 1.15rem;
+            height: 1.15rem;
+            stroke: currentColor;
+        }
+
+        /* ════════════════════════════════════════════════════
+           LIGHT THEME — profil jour optimisé
+           Hiérarchie de surfaces :
+             page  → #eef2f7 (gradient doux)
+             card  → #ffffff  border #e2e8f0
+             inner → #f8fafc  border #e8edf3
+             input → #ffffff  border #cbd5e1
+        ════════════════════════════════════════════════════ */
+
+        body.theme-light {
+            background: rgb(238 242 247);
+            color: rgb(15 23 42);
+        }
+
+        /* ── Page background ── */
+        body.theme-light .min-h-screen {
+            background:
+                radial-gradient(circle at 12% 10%, rgba(8, 145, 178, 0.10), transparent 32%),
+                radial-gradient(circle at 88% 88%, rgba(22, 163, 74, 0.08), transparent 30%),
+                linear-gradient(160deg, #eef2f7 0%, #e2eaf3 55%, #dde6f0 100%) !important;
+        }
+
+        /* ── Slate surface overrides ── */
+        body.theme-light [class*="bg-slate-950"] { background-color: rgb(255 255 255) !important; }
+        body.theme-light [class*="bg-slate-900"] { background-color: rgb(248 250 252) !important; }
+        body.theme-light [class*="bg-slate-800"] { background-color: rgb(241 245 249) !important;  }
+
+        /* ── Slate border overrides ── */
+        body.theme-light [class*="border-slate-9"],
+        body.theme-light [class*="border-slate-8"],
+        body.theme-light [class*="border-slate-7"] {
+            border-color: rgb(226 232 240) !important;
+        }
+
+        /* ── Text — slate scale ── */
+        body.theme-light [class*="text-slate-100"],
+        body.theme-light [class*="text-slate-200"],
+        body.theme-light [class*="text-slate-300"] { color: rgb(15 23 42) !important; }
+
+        body.theme-light [class*="text-slate-400"] { color: rgb(71 85 105) !important; }
+
+        body.theme-light [class*="text-slate-500"],
+        body.theme-light [class*="text-slate-600"] { color: rgb(100 116 139) !important; }
+
+        /* ── Text — accent scale (saturés pour lisibilité sur blanc) ── */
+        body.theme-light [class*="text-cyan-"]    { color: rgb(8 145 178)   !important; }
+        body.theme-light [class*="text-emerald-"] { color: rgb(22 101 52)   !important; }
+        body.theme-light [class*="text-amber-"]   { color: rgb(180 83 9)    !important; }
+        body.theme-light [class*="text-rose-"]    { color: rgb(190 18 60)   !important; }
+        body.theme-light [class*="text-fuchsia-"] { color: rgb(162 28 175)  !important; }
+        body.theme-light [class*="text-sky-"]     { color: rgb(3 105 161)   !important; }
+    body.theme-light [class*="text-violet-"]  { color: rgb(109 40 217)  !important; }
+
+        /* ── Accent borders (plus visibles sur fond clair) ── */
+        body.theme-light [class*="border-cyan-"]    { border-color: rgb(8 145 178 / 0.50)   !important; }
+        body.theme-light [class*="border-emerald-"] { border-color: rgb(22 163 74 / 0.50)   !important; }
+        body.theme-light [class*="border-amber-"]   { border-color: rgb(217 119 6 / 0.60)   !important; }
+        body.theme-light [class*="border-rose-"]    { border-color: rgb(225 29 72 / 0.50)   !important; }
+        body.theme-light [class*="border-fuchsia-"] { border-color: rgb(192 38 211 / 0.50)  !important; }
+        body.theme-light [class*="border-sky-"]     { border-color: rgb(14 165 233 / 0.50)  !important; }
+    body.theme-light [class*="border-violet-"]  { border-color: rgb(109 40 217 / 0.50)  !important; }
+
+        /* ── Accent badge/pill backgrounds ── */
+        body.theme-light [class*="bg-cyan-"]    { background-color: rgb(236 254 255) !important; }
+        body.theme-light [class*="bg-emerald-"] { background-color: rgb(240 253 244) !important; }
+        body.theme-light [class*="bg-amber-"]   { background-color: rgb(255 251 235) !important; }
+        body.theme-light [class*="bg-rose-"]    { background-color: rgb(255 241 242) !important; }
+        body.theme-light [class*="bg-fuchsia-"] { background-color: rgb(253 244 255) !important; }
+        body.theme-light [class*="bg-sky-"]     { background-color: rgb(240 249 255) !important; }
+    body.theme-light [class*="bg-violet-"]  { background-color: rgb(245 243 255) !important; }
+
+        /* ── Hover surfaces ── */
+        body.theme-light [class*="hover:bg-slate-8"]:hover,
+        body.theme-light [class*="hover:bg-slate-9"]:hover { background-color: rgb(241 245 249) !important; }
+        body.theme-light [class*="hover:bg-cyan-"]:hover    { background-color: rgb(207 250 254) !important; }
+        body.theme-light [class*="hover:bg-emerald-"]:hover { background-color: rgb(209 250 229) !important; }
+        body.theme-light [class*="hover:bg-rose-"]:hover    { background-color: rgb(255 228 230) !important; }
+        body.theme-light [class*="hover:bg-amber-"]:hover   { background-color: rgb(254 243 199) !important; }
+        body.theme-light [class*="hover:bg-fuchsia-"]:hover { background-color: rgb(245 226 254) !important; }
+    body.theme-light [class*="hover:bg-violet-"]:hover  { background-color: rgb(237 233 254) !important; }
+
+        /* ── Links ── */
+        body.theme-light a       { color: rgb(3 105 161); }
+        body.theme-light a:hover { color: rgb(8 145 178); }
+
+        /* ── Inputs / textarea / select ── */
+        body.theme-light input,
+        body.theme-light textarea,
+        body.theme-light select {
+            background-color: rgb(255 255 255) !important;
+            color: rgb(15 23 42) !important;
+            border-color: rgb(203 213 225) !important;
+        }
+        body.theme-light input:focus,
+        body.theme-light textarea:focus,
+        body.theme-light select:focus {
+            border-color: rgb(8 145 178 / 0.6) !important;
+            box-shadow: 0 0 0 2px rgb(8 145 178 / 0.18) !important;
+        }
+        body.theme-light [class*="placeholder:text-slate-500"]::placeholder { color: rgb(148 163 184) !important; }
+
+        /* ── Buttons — ciblés par accent, pas de catch-all ── */
+        body.theme-light button[class*="border-slate-"] {
+            background-color: rgb(255 255 255) !important;
+            color: rgb(30 41 59) !important;
+            border-color: rgb(203 213 225) !important;
+        }
+        body.theme-light button[class*="border-slate-"]:hover:not(:disabled) {
+            background-color: rgb(241 245 249) !important;
+        }
+        body.theme-light button[class*="border-cyan-"] {
+            color: rgb(8 145 178) !important;
+            background-color: rgb(240 253 255) !important;
+            border-color: rgb(8 145 178 / 0.42) !important;
+        }
+        body.theme-light button[class*="border-cyan-"]:hover:not(:disabled)    { background-color: rgb(207 250 254) !important; }
+        body.theme-light button[class*="border-emerald-"] {
+            color: rgb(22 101 52) !important;
+            background-color: rgb(240 253 244) !important;
+            border-color: rgb(22 163 74 / 0.42) !important;
+        }
+        body.theme-light button[class*="border-emerald-"]:hover:not(:disabled) { background-color: rgb(209 250 229) !important; }
+        body.theme-light button[class*="border-amber-"] {
+            color: rgb(180 83 9) !important;
+            background-color: rgb(255 251 235) !important;
+            border-color: rgb(217 119 6 / 0.50) !important;
+        }
+        body.theme-light button[class*="border-amber-"]:hover:not(:disabled)   { background-color: rgb(254 243 199) !important; }
+        body.theme-light button[class*="border-rose-"] {
+            color: rgb(190 18 60) !important;
+            background-color: rgb(255 241 242) !important;
+            border-color: rgb(225 29 72 / 0.42) !important;
+        }
+        body.theme-light button[class*="border-rose-"]:hover:not(:disabled)    { background-color: rgb(255 228 230) !important; }
+        body.theme-light button[class*="border-fuchsia-"] {
+            color: rgb(162 28 175) !important;
+            background-color: rgb(250 240 255) !important;
+            border-color: rgb(192 38 211 / 0.42) !important;
+        }
+        body.theme-light button[class*="border-fuchsia-"]:hover:not(:disabled) { background-color: rgb(245 226 254) !important; }
+        body.theme-light button:disabled { opacity: 0.5; }
+        body.theme-light button[class*="border-violet-"] {
+            color: rgb(109 40 217) !important;
+            background-color: rgb(245 243 255) !important;
+            border-color: rgb(109 40 217 / 0.42) !important;
+        }
+        body.theme-light button[class*="border-violet-"]:hover:not(:disabled) { background-color: rgb(237 233 254) !important; }
+
+        /* ── Nav tabs ── */
+        body.theme-light nav {
+            background: rgb(255 255 255 / 0.96) !important;
+            border-color: rgb(214 220 231) !important;
+            box-shadow: 0 1px 4px rgb(148 163 184 / 0.18) !important;
+        }
+        body.theme-light #tab-clab.bg-slate-700,
+        body.theme-light #tab-doc.bg-slate-700,
+        body.theme-light #tab-admin.bg-slate-700 {
+            background: rgb(8 145 178 / 0.12) !important;
+            color: rgb(8 145 178) !important;
+            border: 1px solid rgb(8 145 178 / 0.28) !important;
+        }
+        body.theme-light #tab-clab.text-slate-400,
+        body.theme-light #tab-doc.text-slate-400,
+        body.theme-light #tab-admin.text-slate-400 {
+            color: rgb(71 85 105) !important;
+            background: rgb(226 232 240 / 0.50) !important;
+        }
+        body.theme-light #tab-clab.text-slate-400:hover,
+        body.theme-light #tab-doc.text-slate-400:hover,
+        body.theme-light #tab-admin.text-slate-400:hover {
+            background: rgb(203 213 225 / 0.70) !important;
+        }
+
+        /* ── Top banner ── */
+        body.theme-light #top-banner {
+            background: rgb(255 255 255 / 0.97) !important;
+            border-color: rgb(214 220 231) !important;
+            box-shadow: 0 2px 12px rgb(148 163 184 / 0.18) !important;
+        }
+
+        /* ── Login screen ── */
+        body.theme-light #login-screen > div {
+            background: rgb(255 255 255) !important;
+            border-color: rgb(214 220 231) !important;
+            box-shadow: 0 8px 32px rgb(148 163 184 / 0.20) !important;
+        }
+
+        /* ── Session panel ── */
+        body.theme-light #session-panel {
+            background: rgb(255 255 255) !important;
+            border-color: rgb(214 220 231) !important;
+            box-shadow: 0 4px 16px rgb(148 163 184 / 0.16) !important;
+        }
+
+        /* ── View sections ── */
+        body.theme-light #view-clab section,
+        body.theme-light #view-doc > div > section,
+        body.theme-light #view-admin section {
+            background: rgb(255 255 255) !important;
+            border-color: rgb(226 232 240) !important;
+            box-shadow: 0 1px 3px rgb(148 163 184 / 0.12), 0 4px 16px rgb(148 163 184 / 0.08);
+        }
+
+        /* ── VM / doc / admin cards ── */
+        body.theme-light #cards > article,
+        body.theme-light #doc-labs article,
+        body.theme-light #admin-users > div,
+        body.theme-light #admin-vms > div,
+        body.theme-light #admin-audit > div {
+            background: rgb(255 255 255) !important;
+            border-color: rgb(226 232 240) !important;
+            box-shadow: 0 1px 3px rgb(148 163 184 / 0.10);
+        }
+
+        /* ── Headings ── */
+        body.theme-light #view-clab h2, body.theme-light #view-doc h2, body.theme-light #view-admin h2,
+        body.theme-light #view-clab h3, body.theme-light #view-doc h3, body.theme-light #view-admin h3,
+        body.theme-light #view-clab h4, body.theme-light #view-doc h4, body.theme-light #view-admin h4 {
+            color: rgb(15 23 42) !important;
+        }
+
+        /* ── Graph panel ── */
+        body.theme-light #graph-panel {
+            background: rgb(248 250 252) !important;
+            border-color: rgb(203 213 225) !important;
+            color: rgb(51 65 85) !important;
+        }
+
+        /* ── Doc labs section ── */
+        body.theme-light #doc-labs > section {
+            background: rgb(255 255 255) !important;
+            border-color: rgb(186 230 253 / 0.70) !important;
+        }
+
+        /* ── Admin sections ── */
+        body.theme-light #admin-central-section {
+            background: rgb(255 255 255) !important;
+            border-left-color: rgb(148 163 184 / 0.80) !important;
+        }
+        body.theme-light #admin-directory-section {
+            border-left-color: rgb(8 145 178 / 0.60) !important;
+        }
+        body.theme-light #admin-vms,
+        body.theme-light #admin-users,
+        body.theme-light #admin-audit,
+        body.theme-light #admin-central-resources,
+        body.theme-light #admin-central-summary {
+            color: rgb(30 41 59) !important;
+        }
+
+        /* ── Resource graph SVG ── */
+        body.theme-light #admin-central-resources .rounded-lg {
+            background: rgb(248 250 252) !important;
+            border-color: rgb(203 213 225) !important;
+        }
+        body.theme-light #admin-central-resources svg {
+            background: rgb(241 245 249) !important;
+            border-color: rgb(203 213 225) !important;
+        }
+        body.theme-light #admin-central-resources svg line {
+            stroke: rgb(203 213 225) !important;
+        }
+        body.theme-light #admin-central-resources p.text-slate-400,
+        body.theme-light #admin-central-resources span.text-slate-400,
+        body.theme-light #admin-central-resources div.text-slate-400 { color: rgb(71 85 105) !important; }
+
+        /* ── resourceBlock inline cards ── */
+        body.theme-light .bg-slate-900\/80 {
+            background: rgb(248 250 252) !important;
+            border-color: rgb(203 213 225) !important;
+        }
+        body.theme-light .bg-slate-900\/70 { background: rgb(248 250 252 / 0.95) !important; }
+
+        /* ── Progress bar tracks ── */
+        body.theme-light .bg-slate-800.overflow-hidden { background: rgb(226 232 240) !important; }
+        body.theme-light .h-1\.5.bg-rose-500    { background: rgb(244 63 94)  !important; filter: none; }
+        body.theme-light .h-1\.5.bg-amber-500   { background: rgb(245 158 11) !important; filter: none; }
+        body.theme-light .h-1\.5.bg-emerald-500 { background: rgb(34 197 94)  !important; filter: none; }
+
+        /* ── Modal overlays ── */
+        body.theme-light .fixed.inset-0[class*="bg-black"] {
+            background: rgb(15 23 42 / 0.40) !important;
+        }
+        body.theme-light .fixed.inset-0 > div[class*="bg-slate"],
+        body.theme-light .fixed > div[class*="bg-slate-9"],
+        body.theme-light .fixed > div[class*="bg-slate-8"] {
+            background: rgb(255 255 255) !important;
+            border-color: rgb(203 213 225) !important;
+            box-shadow: 0 20px 60px rgb(15 23 42 / 0.16) !important;
+        }
+
+        /* ── Toast container ── */
+        body.theme-light #toast-container > div {
+            background: rgb(255 255 255) !important;
+            border-color: rgb(203 213 225) !important;
+            color: rgb(15 23 42) !important;
+            box-shadow: 0 4px 16px rgb(148 163 184 / 0.22) !important;
+        }
+
+        /* ── Lab requests panel ── */
+        body.theme-light #lab-requests-panel {
+            background: rgb(255 255 255) !important;
+            border-color: rgb(226 232 240) !important;
+        }
+        body.theme-light #lab-requests-panel article {
+            background: rgb(248 250 252) !important;
+            border-color: rgb(226 232 240) !important;
+        }
+        body.theme-light #lab-requests-panel details {
+            background: rgb(250 252 254) !important;
+            border-color: rgb(226 232 240) !important;
+        }
+        body.theme-light #lab-requests-panel summary {
+            color: rgb(30 41 59) !important;
+        }
+        body.theme-light #lab-requests-panel summary:hover {
+            background: rgb(241 245 249 / 0.80) !important;
+        }
+
+        /* ── native details/summary (hors panel) ── */
+        body.theme-light details > summary { color: rgb(30 41 59); }
+        body.theme-light details > summary:hover { background: rgb(241 245 249 / 0.60); border-radius: 0.375rem; }
+
+        /* ── Quill rich editor ── */
+        body.theme-light .doc-rich-editor .ql-toolbar.ql-snow {
+            background: rgb(248 250 252);
+            border-bottom-color: rgb(203 213 225);
+        }
+        body.theme-light .doc-rich-editor .ql-container.ql-snow,
+        body.theme-light .doc-rich-editor .ql-editor { color: rgb(15 23 42); }
+        body.theme-light .doc-rich-editor .ql-snow .ql-stroke { stroke: rgb(30 41 59); }
+        body.theme-light .doc-rich-editor .ql-snow .ql-fill  { fill:  rgb(30 41 59); }
+        body.theme-light .doc-rich-editor .ql-snow .ql-picker,
+        body.theme-light .doc-rich-editor .ql-snow .ql-picker-label,
+        body.theme-light .doc-rich-editor .ql-snow .ql-picker-item { color: rgb(30 41 59); }
+        body.theme-light .doc-rich-editor .ql-snow .ql-picker-options {
+            background: rgb(255 255 255);
+            border-color: rgb(203 213 225);
+        }
+
+        /* ── Theme toggle button ── */
+        body.theme-light #theme-toggle {
+            background: rgb(255 255 255);
+            border-color: rgb(148 163 184);
+            color: rgb(15 23 42);
+        }
+        body.theme-light #theme-toggle:hover { background: rgb(241 245 249); }
+
+        body.doc-fullscreen-open {
+            overflow: hidden;
+        }
+
+        article.doc-card-fullscreen {
+            position: fixed;
+            inset: 1rem;
+            z-index: 90;
+            overflow: auto;
+            background: rgb(2 6 23 / 0.98) !important;
+            border-color: rgb(14 116 144 / 0.8) !important;
+            box-shadow: 0 0 0 1px rgb(14 116 144 / 0.5), 0 24px 72px rgb(2 6 23 / 0.7);
+        }
+
+        body.theme-light article.doc-card-fullscreen {
+            background: rgb(255 255 255 / 0.98) !important;
+            border-color: rgb(14 116 144 / 0.55) !important;
+            box-shadow: 0 0 0 1px rgb(14 116 144 / 0.35), 0 24px 72px rgb(148 163 184 / 0.35);
+        }
+
+        article.doc-card-fullscreen .doc-rich-editor .ql-container.ql-snow,
+        article.doc-card-fullscreen .doc-rich-editor .ql-editor {
+            min-height: 46vh;
+        }
+
+        article.doc-card-fullscreen .doc-pdf-frame {
+            height: 72vh !important;
+        }
+
+        @media (max-width: 768px) {
+            article.doc-card-fullscreen {
+                inset: 0.5rem;
+            }
+
+            article.doc-card-fullscreen .doc-pdf-frame {
+                height: 58vh !important;
+            }
+        }
+
+        /* ── Activity rail ── */
+        body {
+            --activity-rail-width: 20rem;
+        }
+
+        #dashboard-shell {
+            transition: padding-left 0.25s ease;
+        }
+
+        body.activity-rail-expanded #dashboard-shell {
+            padding-left: var(--activity-rail-width);
+        }
+
+        #activity-rail {
+            position: fixed;
+            left: 0;
+            top: 5.75rem;
+            bottom: 0.75rem;
+            width: var(--activity-rail-width);
+            z-index: 45;
+            transform: translateX(-100%);
+            transition: transform 0.25s ease;
+            pointer-events: none;
+        }
+
+        #activity-rail.activity-rail-open {
+            transform: translateX(0);
+        }
+
+        #activity-rail > .activity-rail-inner,
+        #activity-rail > .activity-rail-toggle {
+            pointer-events: auto;
+        }
+
+        .activity-rail-inner {
+            height: 100%;
+            border: 1px solid rgb(51 65 85 / 0.95);
+            border-left: 0;
+            border-radius: 0 0.9rem 0.9rem 0;
+            background: linear-gradient(180deg, rgb(2 6 23 / 0.96) 0%, rgb(15 23 42 / 0.95) 100%);
+            box-shadow: 0 10px 28px rgb(2 6 23 / 0.45);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #activity-rail:not(.activity-rail-open) .activity-rail-inner {
+            box-shadow: none;
+        }
+
+        .activity-rail-toggle {
+            position: absolute;
+            top: 50%;
+            right: -1.1rem;
+            transform: translateY(-50%);
+            width: 1.1rem;
+            height: 8.5rem;
+            border-radius: 0 0.6rem 0.6rem 0;
+            border: 1px solid rgb(51 65 85);
+            border-left: 0;
+            background: rgb(15 23 42 / 0.95);
+            color: rgb(125 211 252);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            line-height: 1;
+        }
+
+        .activity-docked-widget {
+            border: 1px solid rgb(100 116 139 / 0.6);
+            border-radius: 0.6rem;
+            background: rgb(15 23 42 / 0.72);
+            padding: 0.55rem;
+        }
+
+        body.theme-light .activity-rail-inner {
+            background: linear-gradient(180deg, rgb(255 255 255 / 0.98) 0%, rgb(248 250 252 / 0.98) 100%);
+            border-color: rgb(203 213 225 / 0.95);
+            box-shadow: 0 10px 28px rgb(148 163 184 / 0.28);
+        }
+
+        body.theme-light .activity-rail-toggle {
+            background: rgb(248 250 252 / 0.98);
+            border-color: rgb(203 213 225);
+            color: rgb(3 105 161);
+        }
+
+        body.theme-light .activity-docked-widget {
+            border-color: rgb(203 213 225);
+            background: rgb(255 255 255);
+        }
+
+        @media (max-width: 1279px) {
+            body {
+                --activity-rail-width: 18rem;
+            }
+
+            #activity-rail {
+                top: 4.9rem;
+            }
+
+            .activity-rail-toggle {
+                height: 7.2rem;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            body.activity-rail-expanded #dashboard-shell {
+                padding-left: 0;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100">
+    <div class="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.15),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(34,197,94,0.12),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)]">
+        <div class="w-full mx-auto p-6">
+            <header id="top-banner" class="mb-4 max-w-xl mx-auto rounded-2xl border border-slate-800/80 bg-slate-950/70 backdrop-blur px-4 py-3 shadow-2xl shadow-slate-950/30">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="flex items-start gap-3">
+                        <img src="/static/branding/site-mark.svg" alt="VLM Logo" class="h-10 w-auto shrink-0 object-contain" />
+                        <div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <p class="text-[11px] uppercase tracking-[0.25em] text-cyan-300/80">Virtual Labs Management</p>
+                                <span class="inline-flex items-center rounded-full border border-cyan-500/40 bg-cyan-500/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-cyan-100">VLM</span>
+                            </div>
+                            <h1 class="text-2xl font-black leading-tight tracking-tight">VLM Dashboard</h1>
+                            <p class="text-slate-400 mt-1 text-xs">Rafraîchissement : <span id="refresh-rate">{{ refresh_seconds }}</span>s</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-stretch gap-2 lg:items-end">
+                        <button id="theme-toggle" type="button" aria-label="Activer le mode clair" title="Activer le mode clair">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="12" cy="12" r="5"></circle>
+                                <path d="M12 1v2"></path>
+                                <path d="M12 21v2"></path>
+                                <path d="M4.22 4.22l1.42 1.42"></path>
+                                <path d="M18.36 18.36l1.42 1.42"></path>
+                                <path d="M1 12h2"></path>
+                                <path d="M21 12h2"></path>
+                                <path d="M4.22 19.78l1.42-1.42"></path>
+                                <path d="M18.36 5.64l1.42-1.42"></path>
+                            </svg>
+                            <span class="sr-only">Basculer le thème</span>
+                        </button>
+                    <div id="session-panel" class="hidden rounded-xl border border-slate-800 bg-slate-900/80 px-4 py-3">
+                        <!-- Barre compacte toujours visible -->
+                        <div class="flex items-center justify-between gap-3">
+                            <button id="session-toggle-button" type="button"
+                                class="flex items-center gap-2 text-sm font-semibold text-slate-200 hover:text-cyan-300 transition-colors">
+                                <svg class="h-4 w-4 text-cyan-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="8" r="4"/><path stroke-linecap="round" d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+                                </svg>
+                                <span class="text-slate-400 font-normal">Gérer mon compte</span>
+                                <span class="text-slate-600">—</span>
+                                <span id="session-user-name" class="text-cyan-300"></span>
+                                <svg id="session-toggle-icon" class="h-4 w-4 shrink-0 transition-transform duration-200 text-slate-500"
+                                    fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                            <button id="logout-button" class="text-xs px-3 py-2 rounded-lg border border-rose-700 text-rose-200 hover:bg-rose-900/30">Déconnexion</button>
+                        </div>
+                        <!-- Corps collapsible (masqué par défaut) -->
+                        <div id="session-body" class="mt-3 border-t border-slate-800 pt-3 overflow-hidden" style="max-height:0;opacity:0;transition:max-height 0.35s ease,opacity 0.3s ease;">
+                            <p id="session-user-meta" class="text-xs text-slate-400 mb-3"></p>
+                            <form id="change-password-form" class="grid gap-2 md:grid-cols-3">
+                                <input id="current-password" type="password" placeholder="Mot de passe actuel" class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                                <input id="new-password" type="password" placeholder="Nouveau mot de passe" class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                                <button type="submit" class="rounded-lg border border-cyan-700 px-3 py-2 text-xs text-cyan-200 hover:bg-cyan-900/30">Changer le mot de passe</button>
+                            </form>
+                            <p id="change-password-feedback" class="hidden text-xs mt-2"></p>
+                            <div class="mt-4 border-t border-slate-800 pt-3">
+                                <p class="text-[11px] uppercase tracking-wide text-slate-400">Clés SSH (jump host)</p>
+                                <p class="text-[11px] text-slate-500 mt-1">Une clé publique par ligne (format OpenSSH).</p>
+                                <textarea id="ssh-keys-input" rows="4" class="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-[11px] text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="ssh-ed25519 AAAAC3... user@host"></textarea>
+                                <div class="mt-2 flex items-center gap-2">
+                                    <button id="ssh-keys-save-button" type="button" class="rounded-lg border border-emerald-700 px-3 py-2 text-[11px] text-emerald-200 hover:bg-emerald-900/30">Enregistrer les clés SSH</button>
+                                    <span id="ssh-keys-feedback" class="hidden text-[11px]"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+            </header>
+
+            <section id="login-screen" class="max-w-xl mx-auto rounded-2xl border border-slate-800 bg-slate-950/85 p-6 shadow-2xl shadow-slate-950/40">
+                <div class="mb-5">
+                    <p class="text-xs uppercase tracking-[0.35em] text-emerald-300/80">Accès sécurisé</p>
+                    <h2 class="text-2xl font-bold mt-2">Connexion au central</h2>
+                    <p class="text-sm text-slate-400 mt-2">L’authentification est gérée sur le central. Les actions LAB sont journalisées avec l’identité de l’utilisateur connecté.</p>
+                </div>
+                <form id="login-form" method="post" class="space-y-4">
+                    <input type="hidden" name="next_path" value="{{ login_next or '' }}" />
+                    <div>
+                        <label for="login-username" class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Nom d’utilisateur</label>
+                        <input id="login-username" name="username" type="text" value="{{ login_username or '' }}" required class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                    </div>
+                    <div>
+                        <label for="login-password" class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Mot de passe</label>
+                        <input id="login-password" name="password" type="password" required class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                    </div>
+                    <p id="login-error" class="{% if login_error %}text-sm text-rose-300{% else %}hidden text-sm text-rose-300{% endif %}">{{ login_error or '' }}</p>
+                    <button type="submit" id="login-submit" class="w-full rounded-xl border border-emerald-700 bg-emerald-950/40 px-4 py-3 text-sm font-semibold text-emerald-100 hover:bg-emerald-900/40">Se connecter</button>
+                </form>
+                <div class="mt-5 rounded-xl border border-amber-700/40 bg-amber-950/20 p-4 text-xs text-amber-100/90">
+                    <p class="font-semibold">Veuillez vous authentifier pour accéder aux LABs</p>
+                </div>
+            </section>
+
+            <!-- ── Reset password via token ── -->
+            <section id="reset-token-screen" class="hidden max-w-xl mx-auto rounded-2xl border border-slate-800 bg-slate-950/85 p-6 shadow-2xl shadow-slate-950/40">
+                <div class="mb-5">
+                    <p class="text-xs uppercase tracking-[0.35em] text-amber-300/80">Réinitialisation du mot de passe</p>
+                    <h2 class="text-2xl font-bold mt-2">Nouveau mot de passe</h2>
+                    <p class="text-sm text-slate-400 mt-2">Ce lien est à usage unique et valable 2 heures. Choisissez un mot de passe d'au moins 10 caractères.</p>
+                </div>
+                <form id="reset-token-form" class="space-y-4">
+                    <div>
+                        <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Nouveau mot de passe</label>
+                        <input id="reset-token-password" type="password" required minlength="10" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                    </div>
+                    <div>
+                        <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Confirmer le mot de passe</label>
+                        <input id="reset-token-password-confirm" type="password" required minlength="10" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                    </div>
+                    <p id="reset-token-error" class="hidden text-sm text-rose-300"></p>
+                    <button type="submit" id="reset-token-submit" class="w-full rounded-xl border border-amber-700 bg-amber-950/40 px-4 py-3 text-sm font-semibold text-amber-100 hover:bg-amber-900/40">Définir le nouveau mot de passe</button>
+                </form>
+                <p id="reset-token-success" class="hidden mt-4 rounded-xl border border-emerald-700/50 bg-emerald-950/30 p-4 text-sm text-emerald-200">Mot de passe mis à jour. <a href="/" class="underline">Se connecter</a></p>
+            </section>
+
+            <div id="dashboard-shell" class="hidden">
+                <aside id="activity-rail" class="hidden" aria-label="Activités utilisateur">
+                    <div class="activity-rail-inner">
+                        <div class="px-3 pt-3 pb-2 border-b border-slate-800">
+                            <p class="text-[10px] uppercase tracking-[0.2em] text-cyan-300/80">Mes activités</p>
+                            <p class="text-sm font-semibold text-slate-100 mt-1">Activités utilisateur</p>
+                            <p class="text-[11px] text-slate-400 mt-1">En cours + historique glissant 48h</p>
+                        </div>
+
+                        <div class="px-3 pt-2 pb-2 border-b border-slate-800">
+                            <div class="flex items-center justify-between">
+                                <p class="text-[11px] uppercase tracking-wide text-amber-300/80">En cours</p>
+                                <span id="activity-current-count" class="text-[10px] px-2 py-0.5 rounded-full border border-amber-700/60 bg-amber-950/25 text-amber-200">0</span>
+                            </div>
+                            <div id="activity-current-list" class="mt-2 space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                                <p class="text-[11px] text-slate-500">Aucune action en cours.</p>
+                            </div>
+                        </div>
+
+                        <div class="px-3 pt-2 pb-2 border-b border-slate-800">
+                            <div class="flex items-center justify-between">
+                                <p class="text-[11px] uppercase tracking-wide text-cyan-300/80">Fenêtres minimisées</p>
+                                <span id="activity-docked-count" class="text-[10px] px-2 py-0.5 rounded-full border border-cyan-700/60 bg-cyan-950/25 text-cyan-200">0</span>
+                            </div>
+                            <div id="activity-docked-widgets" class="mt-2 space-y-2 max-h-44 overflow-y-auto pr-1"></div>
+                        </div>
+
+                        <div class="px-3 pt-2 pb-3 min-h-0 flex-1 overflow-hidden">
+                            <div class="flex items-center justify-between">
+                                <p class="text-[11px] uppercase tracking-wide text-fuchsia-300/80">Historique 48h</p>
+                                <span id="activity-history-count" class="text-[10px] px-2 py-0.5 rounded-full border border-fuchsia-700/60 bg-fuchsia-950/25 text-fuchsia-200">0</span>
+                            </div>
+                            <div id="activity-history-list" class="mt-2 space-y-1.5 h-full max-h-[calc(100%-1.8rem)] overflow-y-auto pr-1">
+                                <p class="text-[11px] text-slate-500">Aucune activité récente.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="activity-rail-toggle" type="button" class="activity-rail-toggle" aria-label="Étendre le panneau activités" title="Rétracter/étendre">▸</button>
+                </aside>
+
+                <!-- ── Navigation par onglets ── -->
+                <nav class="flex items-center gap-1 mb-5 rounded-xl border border-slate-800 bg-slate-950/70 p-1.5">
+                    <button id="tab-clab" class="flex-1 text-xs px-4 py-2 rounded-lg font-medium transition-colors bg-slate-700 text-slate-100 hover:bg-slate-800/40">
+                        Vue Labs
+                    </button>
+                    <button id="tab-doc" class="flex-1 text-xs px-4 py-2 rounded-lg font-medium transition-colors text-slate-400 hover:bg-slate-800/40">
+                        Documentation
+                    </button>
+                    <button id="tab-admin" class="hidden flex-1 text-xs px-4 py-2 rounded-lg font-medium transition-colors text-slate-400 hover:bg-slate-800/40">
+                        Administration
+                    </button>
+                    <a
+                        href="/topology-builder"
+                        title="Ouvrir Topology Builder"
+                        aria-label="Ouvrir Topology Builder"
+                        class="inline-flex items-center justify-center rounded-lg border border-cyan-700/60 bg-cyan-950/30 px-2.5 py-2 text-cyan-300 transition-colors hover:bg-cyan-900/40"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
+                            <path d="M8 8h8" />
+                            <path d="M8 16h8" />
+                            <path d="M8 8v8" />
+                            <path d="M16 8v8" />
+                            <rect x="3.5" y="3.5" width="5" height="5" rx="1" />
+                            <rect x="15.5" y="3.5" width="5" height="5" rx="1" />
+                            <rect x="3.5" y="15.5" width="5" height="5" rx="1" />
+                            <rect x="15.5" y="15.5" width="5" height="5" rx="1" />
+                        </svg>
+                    </a>
+                </nav>
+
+                <!-- ── Vue Labs ── -->
+                <div id="view-clab" class="flex flex-col 2xl:flex-row gap-4 items-start">
+                    <div class="w-full 2xl:flex-1 min-w-0">
+                        <div id="cards" class="grid grid-cols-1 xl:grid-cols-1 gap-4"></div>
+                        <section id="lab-requests-panel" class="rounded-xl border border-slate-800 bg-slate-950/70 p-4 mt-4 hidden">
+                            <details id="lab-requests-details">
+                                <summary class="cursor-pointer flex items-center justify-between gap-2">
+                                    <span class="text-sm font-semibold text-slate-100">Demandes LAB et suggestions</span>
+                                    <span id="lab-requests-count" class="text-[11px] px-2 py-0.5 rounded-full border border-cyan-700/70 bg-cyan-900/20 text-cyan-200">0</span>
+                                </summary>
+                                <div class="mt-3 space-y-4">
+                                    <p id="lab-requests-help" class="text-xs text-slate-400">
+                                        Décrivez vos besoins en ressources ou en images routeur. Seuls les admins (hors group-admin) et l'auteur voient la demande.
+                                    </p>
+                                    <form id="lab-request-form" class="grid gap-3 md:grid-cols-2">
+                                        <div class="md:col-span-2">
+                                            <label class="block text-[11px] uppercase tracking-wide text-slate-400 mb-1">Titre</label>
+                                            <input id="lab-request-title" name="suggestion_title" maxlength="120" placeholder="Ex: Nouveau LAB MPLS avancé" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
+                                        </div>
+                                        <div class="md:col-span-2">
+                                            <label class="block text-[11px] uppercase tracking-wide text-slate-400 mb-1">Description du besoin</label>
+                                            <textarea id="lab-request-details" name="need_details" rows="3" required placeholder="Contexte, objectif pedagogique, contraintes..." class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"></textarea>
+                                        </div>
+                                        <div>
+                                            <label class="block text-[11px] uppercase tracking-wide text-slate-400 mb-1">Ressources souhaitees (RAM/CPU/Disque)</label>
+                                            <textarea id="lab-request-resources" name="resources_requirements" rows="2" placeholder="Ex: 8 vCPU, 16 Go RAM, 80 Go disque" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"></textarea>
+                                        </div>
+                                        <div>
+                                            <label class="block text-[11px] uppercase tracking-wide text-slate-400 mb-1">Images routeur souhaitées</label>
+                                            <textarea id="lab-request-images" name="requested_router_images" rows="2" placeholder="Ex: cisco_xrv9k-7.8.1, juniper_vmx-21" class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500"></textarea>
+                                        </div>
+                                        <div class="md:col-span-2 flex items-center justify-end gap-2">
+                                            <button id="lab-request-submit" type="submit" class="text-xs px-3 py-2 rounded border border-cyan-700 text-cyan-200 hover:bg-cyan-900/30">Soumettre la demande</button>
+                                        </div>
+                                    </form>
+                                    <div id="lab-requests-body" class="space-y-3">
+                                        <p class="text-xs text-slate-500">Chargement des demandes...</p>
+                                    </div>
+                                </div>
+                            </details>
+                        </section>
+                    </div>
+                    <aside class="w-full 2xl:w-[42%] 2xl:min-w-[460px] 2xl:max-w-[78vw] space-y-4 2xl:sticky top-4 2xl:resize 2xl:overflow-auto rounded-xl">
+                        <section class="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <h2 class="text-base font-semibold">Diagramme LAB</h2>
+                                <div class="flex items-center gap-2">
+                                    <span id="graph-lab-name" class="text-xs text-slate-400">Aucun LAB sélectionné</span>
+                                    <button id="graph-zoom-in" class="text-xs px-2 py-1 rounded border border-slate-700 hover:bg-slate-800">+</button>
+                                    <button id="graph-zoom-out" class="text-xs px-2 py-1 rounded border border-slate-700 hover:bg-slate-800">-</button>
+                                    <button id="graph-zoom-fit" class="text-xs px-2 py-1 rounded border border-slate-700 hover:bg-slate-800">Fit</button>
+                                    <button id="graph-fullscreen" class="text-xs px-2 py-1 rounded border border-slate-700 hover:bg-slate-800">Plein écran</button>
+                                </div>
+                            </div>
+                            <div id="graph-panel" class="h-[58vh] min-h-[420px] max-h-[80vh] resize overflow-auto rounded-lg border border-slate-800 bg-slate-900 p-3 text-xs text-slate-400">
+                                Clique sur <span class="font-semibold text-slate-200">Graph</span> dans un LAB pour afficher son diagramme.
+                            </div>
+                        </section>
+                    </aside>
+                </div>
+
+                <!-- ── Vue Documentation ── -->
+                <div id="view-doc" class="hidden">
+                    <div class="mb-5">
+                        <p class="text-xs uppercase tracking-[0.35em] text-cyan-300/80">Documentation LAB</p>
+                        <h2 class="text-xl font-bold mt-1">Guides par LAB · texte, diagrammes, PDF</h2>
+                        <p class="text-xs text-slate-400 mt-2">Tous les utilisateurs ont accès en lecture. L'édition est réservée aux admins.</p>
+                    </div>
+                    <div id="doc-labs" class="space-y-4"></div>
+                </div>
+
+                <!-- ── Vue Administration ── -->
+                <div id="view-admin" class="hidden">
+                    <!-- En-tête Admin -->
+                    <div class="mb-5">
+                        <p class="text-xs uppercase tracking-[0.35em] text-fuchsia-300/80">Espace Admin</p>
+                        <h2 class="text-xl font-bold mt-1">Gestion · Utilisateurs, Groupes &amp; Audit</h2>
+                    </div>
+
+                    <!-- Ressources Central -->
+                    <section id="admin-central-section" class="rounded-xl border border-l-4 border-slate-800 border-l-slate-600 bg-slate-950/70 p-4 mb-4">
+                        <div class="flex items-center justify-between gap-3 mb-3">
+                            <h3 class="text-xs uppercase tracking-wide text-slate-400">Ressources Central</h3>
+                            <div class="flex items-center gap-2">
+                                <label for="admin-central-hours" class="text-[11px] text-slate-500">Fenêtre</label>
+                                <select id="admin-central-hours" class="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100">
+                                    <option value="6">6h</option>
+                                    <option value="12">12h</option>
+                                    <option value="24" selected>24h</option>
+                                    <option value="48">48h</option>
+                                    <option value="168">7j</option>
+                                    <option value="720">30j</option>
+                                </select>
+                                <!-- VM selector removed: graphs now inline on each C-Lab card below -->
+                                <button id="admin-central-toggle" class="text-[11px] px-2 py-1 rounded border border-slate-700 text-slate-200 hover:bg-slate-800" type="button">Afficher</button>
+                            </div>
+                        </div>
+                        <div id="admin-central-summary" class="rounded-lg border border-slate-800 bg-slate-900/60 p-2 mb-3">
+                            <p class="text-xs text-slate-500">Chargement du résumé ressources...</p>
+                        </div>
+                        <div id="admin-central-resources-body" class="space-y-3 hidden">
+                            <div id="admin-central-resources" class="space-y-3">
+                                <p class="text-xs text-slate-500">Chargement des métriques central...</p>
+                            </div>
+                            <!-- VM resources removed: graphs now inline on each C-Lab card -->
+                        </div>
+                    </section>
+
+                    <!-- Grille principale : annuaire (groupes + utilisateurs) + VMs -->
+                    <div class="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-4 mb-4">
+
+                        <!-- Annuaire Admin -->
+                        <section id="admin-directory-section" class="rounded-xl border border-l-4 border-slate-800 border-l-cyan-600/60 bg-slate-950/70 p-4">
+                            <div class="flex items-center justify-between gap-2 mb-3">
+                                <h3 class="text-xs uppercase tracking-wide text-cyan-300/80">
+                                    Groupes <span id="admin-groups-count" class="ml-1 rounded-full bg-cyan-900/40 border border-cyan-700/40 px-2 py-0.5 text-cyan-200 font-mono"></span>
+                                    · Utilisateurs <span id="admin-users-count" class="ml-1 rounded-full bg-fuchsia-900/40 border border-fuchsia-700/40 px-2 py-0.5 text-fuchsia-200 font-mono"></span>
+                                    · Admins <span id="admin-admins-count" class="ml-1 rounded-full bg-fuchsia-900/40 border border-fuchsia-700/40 px-2 py-0.5 text-fuchsia-200 font-mono"></span>
+                                </h3>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <button id="admin-create-user-button" class="text-xs px-2.5 py-1.5 rounded-lg border border-fuchsia-700 text-fuchsia-200 hover:bg-fuchsia-900/30">+ Utilisateur</button>
+                                    <button id="admin-create-group-button" class="text-xs px-2.5 py-1.5 rounded-lg border border-cyan-700 text-cyan-200 hover:bg-cyan-900/30">+ Groupe</button>
+                                </div>
+                            </div>
+                            <div id="admin-users" class="space-y-2"></div>
+                        </section>
+
+                        <!-- VMs -->
+                        <section class="rounded-xl border border-l-4 border-slate-800 border-l-emerald-600/60 bg-slate-950/70 p-4">
+                            <div class="flex items-center justify-between gap-2 mb-3">
+                                <h3 class="text-xs uppercase tracking-wide text-emerald-300/80">
+                                    VMs <span id="admin-vms-count" class="ml-1 rounded-full bg-emerald-900/40 border border-emerald-700/40 px-2 py-0.5 text-emerald-200 font-mono"></span>
+                                </h3>
+                                <div class="flex items-center gap-2">
+                                    <label for="admin-vm-hours" class="text-[11px] text-slate-500">Fenêtre graph VM</label>
+                                    <select id="admin-vm-hours" class="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100">
+                                        <option value="6">6h</option>
+                                        <option value="12">12h</option>
+                                        <option value="24" selected>24h</option>
+                                        <option value="48">48h</option>
+                                        <option value="168">7j</option>
+                                        <option value="720">30j</option>
+                                    </select>
+                                    <button id="admin-create-vm-button" class="text-xs px-2.5 py-1.5 rounded-lg border border-emerald-700 text-emerald-200 hover:bg-emerald-900/30 shrink-0">+ VM</button>
+                                </div>
+                            </div>
+                            <div id="admin-vms" class="space-y-2"></div>
+                        </section>
+
+                    </div>
+
+                    <!-- Audit système -->
+                    <section class="rounded-xl border border-l-4 border-slate-800 border-l-amber-600/40 bg-slate-950/70 p-4">
+                        <h3 class="text-xs uppercase tracking-wide text-amber-300/80 mb-3">Événements système</h3>
+                        <div id="admin-audit" class="space-y-2"></div>
+                    </section>
+
+                    <!-- Statistiques d'utilisation -->
+                    <section id="admin-stats-section" class="rounded-xl border border-l-4 border-slate-800 border-l-violet-600/60 bg-slate-950/70 p-4 mt-4">
+                        <div class="flex items-center justify-between gap-3 mb-4">
+                            <h3 class="text-xs uppercase tracking-wide text-violet-300/80">Statistiques d'utilisation</h3>
+                            <div class="flex items-center gap-2">
+                                <select id="stats-granularity" class="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] text-slate-100">
+                                    <option value="day">30 derniers jours</option>
+                                    <option value="week" selected>12 dernières semaines</option>
+                                    <option value="month">12 derniers mois</option>
+                                </select>
+                                <button id="stats-refresh-btn" type="button" class="text-[11px] px-2 py-1 rounded border border-slate-700 text-slate-200 hover:bg-slate-800">↺ Actualiser</button>
+                            </div>
+                        </div>
+                        <div id="admin-stats-body">
+                            <p class="text-xs text-slate-500">Chargement des statistiques...</p>
+                        </div>
+                    </section>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.APP_REFRESH_SECONDS = {{ refresh_seconds }};
+        window.APP_AUTH_ENABLED = {{ 'true' if auth_enabled else 'false' }};
+    </script>
+    <script src="/static/js/core-api.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/utils.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/core-ui.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/core-state.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/theme.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/permissions.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/table-columns.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/activity-rail.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/auth.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/state-render.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/admin-users-groups.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/admin-user-modals.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/labs-actions-config-diff.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/labs-actions-reconfigure.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/labs-actions-set-default.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/labs-actions-sandbox-reservation.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/audit.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/lab-modals.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/lab-requests.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/admin-panel.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/documentation-panel.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/admin-vm-provisioning.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/admin-vm-form.js?v={{ app_js_version }}"></script>
+    <script src="/static/js/app-bootstrap.js?v={{ app_js_version }}"></script>
+</body>
+</html>

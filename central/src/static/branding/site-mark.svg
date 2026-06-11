@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 164 64" role="img" aria-labelledby="title desc">
+  <title>VLM Logo</title>
+  <desc>VLM site mark for the central interface.</desc>
+  <defs>
+    <linearGradient id="vlm-gradient" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="52%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <path d="M6 10C6 5.6 9.6 2 14 2H96C106.4 2 116.2 6.5 122.8 14.3L158 32L122.8 49.7C116.2 57.5 106.4 62 96 62H14C9.6 62 6 58.4 6 54V10Z" fill="url(#vlm-gradient)"/>
+  <text x="28" y="39" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="28" font-style="italic" font-weight="700" letter-spacing="1">VLM</text>
+</svg>

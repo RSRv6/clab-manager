@@ -1,0 +1,41 @@
+central:
+  refresh_seconds: 3          # UI polling interval (seconds)
+
+auth:
+  # Generate with: python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+  session_secret: CHANGE_ME_GENERATE_A_RANDOM_SECRET_KEY_32_CHARS
+  users_file: data/users.json
+  audit_file: data/audit.log.jsonl
+
+agents:
+  - id: vm1                                   # Unique identifier (used in API paths)
+    name: clab-vm-01                          # Display name shown in dashboard
+    ip: 192.168.1.101                         # IP address of the VM
+    port: 8081                                # Port the vm-agent listens on
+    # Generate with: python3 -c "import secrets; print(secrets.token_urlsafe(24))"
+    token: CHANGE_ME_GENERATE_RANDOM_TOKEN_32_CHARS
+    base_url: http://192.168.1.101:8081
+    management_subnet: 172.20.0.0/16          # Subnet used by containerlab on this VM
+    ssh_user: clab-user                       # SSH user for jump access feature
+
+  - id: vm2
+    name: clab-vm-02
+    ip: 192.168.1.102
+    port: 8081
+    token: CHANGE_ME_GENERATE_RANDOM_TOKEN_32_CHARS
+    base_url: http://192.168.1.102:8081
+    management_subnet: 172.21.0.0/16
+    ssh_user: clab-user
+
+  # Add more VMs as needed:
+  # - id: vm3
+  #   name: clab-vm-03
+  #   ip: 192.168.1.103
+  #   port: 8081
+  #   token: CHANGE_ME_GENERATE_RANDOM_TOKEN_32_CHARS
+  #   base_url: http://192.168.1.103:8081
+  #   management_subnet: 172.22.0.0/16
+  #   ssh_user: clab-user
+  #   # Optional: password-based SSH (prefer key-based auth instead)
+  #   # ssh_password: CHANGE_ME
+  #   # sudo_password: CHANGE_ME

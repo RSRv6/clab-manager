@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VLM | Topology Builder</title>
+  <link rel="icon" type="image/svg+xml" href="/static/branding/favicon.svg" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/cytoscape@3.29.2/dist/cytoscape.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+  <style>
+    /* ── Base reset ── */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    body {
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+    /* ── Header ── */
+    #app-header {
+      flex-shrink: 0;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      padding: 0 1.25rem;
+      border-bottom: 1px solid #1e293b;
+      background: rgba(15,23,42,.95);
+      backdrop-filter: blur(6px);
+      gap: 0.75rem;
+      z-index: 30;
+    }
+
+    /* ── Layout ── */
+    #app-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ── Left sidebar ── */
+    #sidebar-left {
+      width: 220px;
+      flex-shrink: 0;
+      border-right: 1px solid #1e293b;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #0f172a;
+    }
+    .sidebar-section {
+      padding: 0.625rem 0.75rem 0.5rem;
+      border-bottom: 1px solid #1e293b;
+      overflow-y: auto;
+    }
+    .sidebar-section:last-child { flex: 1; overflow-y: auto; }
+    .sidebar-title {
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #64748b;
+      margin-bottom: 0.45rem;
+    }
+
+    /* ── Canvas ── */
+    #canvas-wrap {
+      flex: 1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #cy-canvas {
+      flex: 1;
+      background: #0b1120;
+      background-image:
+        radial-gradient(circle at 1px 1px, rgba(51,65,85,.45) 1px, transparent 0);
+      background-size: 24px 24px;
+    }
+
+    /* ── Right panel ── */
+    #sidebar-right {
+      width: 280px;
+      min-width: 180px;
+      max-width: 600px;
+      flex-shrink: 0;
+      border-left: 1px solid #1e293b;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #0f172a;
+      transition: width 0.2s ease;
+    }
+    #sidebar-right.collapsed {
+      width: 32px !important;
+      min-width: 32px;
+    }
+    #sidebar-right.collapsed > *:not(#right-collapse-btn-wrap) { display: none !important; }
+    #right-resize-handle {
+      width: 5px;
+      flex-shrink: 0;
+      cursor: col-resize;
+      background: transparent;
+      border-left: 1px solid #1e293b;
+      transition: background 0.15s;
+      position: relative;
+      z-index: 10;
+    }
+    #right-resize-handle:hover,
+    #right-resize-handle.dragging { background: #3b82f6; border-color: #3b82f6; }
+    #right-collapse-btn-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid #1e293b;
+    }
+    #yaml-preview {
+      font-family: 'Fira Mono', 'JetBrains Mono', ui-monospace, monospace;
+      font-size: 0.72rem;
+      line-height: 1.45;
+      color: #86efac;
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.75rem;
+      white-space: pre;
+    }
+
+    /* ── Form fields ── */
+    .field-label {
+      display: block;
+      font-size: 0.7rem;
+      color: #94a3b8;
+      margin-bottom: 0.2rem;
+    }
+    .field-input {
+      width: 100%;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 5px;
+      padding: 0.35rem 0.55rem;
+      font-size: 0.8rem;
+      color: #e2e8f0;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field-input:focus { border-color: #3b82f6; }
+    select.field-input option { background: #1e293b; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.3rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 5px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary  { background: #1d4ed8; color: #fff; border-color: #3b82f6; }
+    .btn-primary:hover:not(:disabled) { background: #2563eb; }
+    .btn-success  { background: #15803d; color: #fff; border-color: #22c55e; }
+    .btn-success:hover:not(:disabled) { background: #16a34a; }
+    .btn-danger   { background: #7f1d1d; color: #fca5a5; border-color: #ef4444; }
+    .btn-danger:hover:not(:disabled) { background: #991b1b; }
+    .btn-ghost    { background: transparent; color: #94a3b8; border-color: #334155; }
+    .btn-ghost:hover:not(:disabled)  { background: #1e293b; color: #e2e8f0; }
+    .btn-sm { padding: 0.25rem 0.55rem; font-size: 0.72rem; }
+
+    /* ── Tabs ── */
+    #right-tabs { display: flex; border-bottom: 1px solid #1e293b; }
+    .tab-btn {
+      flex: 1;
+      padding: 0.5rem;
+      font-size: 0.72rem;
+      color: #64748b;
+      text-align: center;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+    }
+    .tab-btn.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+    .tab-btn:hover:not(.active) { color: #94a3b8; }
+
+    .tab-pane { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+    .tab-pane.active { display: flex; }
+
+    /* ── Canvas toolbar ── */
+    #canvas-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.75rem;
+      border-bottom: 1px solid #1e293b;
+      background: #0f172a;
+    }
+
+    /* ── Toast ── */
+    #toast-container {
+      position: fixed;
+      top: 64px;
+      right: 1rem;
+      z-index: 9999;
+      pointer-events: none;
+    }
+
+    /* ── Panel animations ── */
+    .panel-fade { animation: fadeIn 0.15s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════ HEADER ════════════════════════════ -->
+<header id="app-header">
+  <a href="/" class="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-xs">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+    </svg>
+    VLM
+  </a>
+  <div class="w-px h-5 bg-slate-700"></div>
+  <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V4a2 2 0 00-2-2H5a2 2 0 00-2 2v11a2 2 0 002 2z"/>
+  </svg>
+  <h1 class="text-sm font-semibold text-slate-100">Topology Builder</h1>
+  <span class="ml-1 px-1.5 py-0.5 bg-blue-900/50 text-blue-300 border border-blue-800 rounded text-xs">BETA</span>
+
+  <div class="ml-auto flex items-center gap-2">
+    <!-- Lab fields -->
+    <input id="field-lab-name" type="text" placeholder="Nom du lab" class="field-input w-36"
+      title="Nom du lab (containerlab name)" />
+    <input id="field-mgmt-network" type="text" placeholder="mgmt-network" class="field-input w-32"
+      title="Nom du réseau Docker de management" value="clab-mgmt" />
+    <input id="field-mgmt-subnet" type="text" placeholder="subnet ex: 172.20.20.0/24" class="field-input w-44"
+      title="Subnet IPv4 du réseau de management" />
+  </div>
+</header>
+
+<!-- ════════════════════════════ BODY ════════════════════════════ -->
+<div id="app-body">
+
+  <!-- ─── LEFT SIDEBAR ─── -->
+  <aside id="sidebar-left">
+
+    <!-- VM Selector -->
+    <div class="sidebar-section" style="min-height:90px">
+      <div class="sidebar-title">VM cible</div>
+      <select id="vm-select" class="field-input text-xs mb-1">
+        <option value="">Chargement...</option>
+      </select>
+      <div id="vm-subnet-info" class="hidden text-xs text-blue-300 mt-1 bg-blue-900/20 rounded px-2 py-1 border border-blue-800/40"></div>
+      <div class="flex items-center justify-between mt-1.5 gap-1">
+        <span id="vm-images-status" class="hidden text-xs text-slate-500"></span>
+        <button id="btn-refresh-images"
+          class="hidden ml-auto shrink-0 btn btn-ghost text-xs px-2 py-0.5 h-auto border border-slate-700 hover:border-blue-600"
+          title="Forcer le rafraîchissement des images Docker depuis l'agent">
+          <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Sync
+        </button>
+      </div>
+
+    <!-- Add nodes -->
+    <div class="sidebar-section">
+      <div class="sidebar-title">Ajouter un équipement</div>
+      <div id="family-buttons" class="flex flex-col gap-1">
+        <!-- Populated by JS -->
+        <div class="text-xs text-slate-500 py-2 text-center">Chargement...</div>
+      </div>
+    </div>
+
+    <!-- Canvas actions -->
+    <div class="sidebar-section">
+      <div class="sidebar-title">Canvas</div>
+      <div class="flex flex-col gap-1">
+        <button id="btn-add-link" class="btn btn-ghost btn-sm w-full justify-start">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101
+                 m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+          </svg>
+          Créer un lien (clic droit)
+        </button>
+        <button id="btn-layout" class="btn btn-ghost btn-sm w-full justify-start">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 6h16M4 12h8m-8 6h16"/>
+          </svg>
+          Auto-layout
+        </button>
+        <button id="btn-clear" class="btn btn-danger btn-sm w-full justify-start">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7
+                 m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+          Effacer tout
+        </button>
+      </div>
+    </div>
+
+    <!-- Properties panels: Node / Link / Info (toggled by JS) -->
+
+    <!-- Info panel (default) -->
+    <div id="panel-info" class="sidebar-section flex-1 panel-fade">
+      <div class="sidebar-title">Informations</div>
+      <div class="text-xs text-slate-500 leading-relaxed">
+        <p class="mb-2">Commencez par :</p>
+        <ol class="list-decimal list-inside space-y-1 text-slate-400">
+          <li>Sélectionner une VM</li>
+          <li>Définir le nom du lab</li>
+          <li>Ajouter des équipements</li>
+          <li>Connecter les nœuds</li>
+          <li>Générer et exporter le YAML</li>
+        </ol>
+        <p class="mt-3 text-slate-600">Cliquez sur un nœud ou un lien pour éditer ses propriétés.</p>
+      </div>
+    </div>
+
+    <!-- Node editor -->
+    <div id="panel-node-editor" class="hidden sidebar-section flex-1 overflow-y-auto panel-fade">
+      <div class="sidebar-title">Propriétés du nœud</div>
+      <input type="hidden" id="edit-node-id" />
+      <div class="space-y-2">
+        <div>
+          <label class="field-label">Nom</label>
+          <input id="edit-node-name" type="text" class="field-input" placeholder="R1, CE-1..." />
+        </div>
+        <div>
+          <label class="field-label">Famille</label>
+          <select id="edit-node-family" class="field-input"><!-- filled by JS --></select>
+        </div>
+        <div>
+          <label class="field-label">Image</label>
+          <select id="edit-node-image" class="field-input"><!-- filled by JS --></select>
+        </div>
+        <div id="edit-node-image-manual-wrap" class="hidden">
+          <label class="field-label">Image personnalisée</label>
+          <input id="edit-node-image-manual" type="text" class="field-input"
+            placeholder="registry/image:tag" />
+        </div>
+        <div>
+          <label class="field-label">IP de management
+            <span class="text-slate-600 font-normal">(doit être dans le subnet VM)</span>
+          </label>
+          <input id="edit-node-mgmt-ip" type="text" class="field-input"
+            placeholder="172.20.20.11" /></div>
+      </div>
+      <div class="flex gap-2 mt-3">
+        <button id="btn-save-node" class="btn btn-primary btn-sm flex-1">Sauvegarder</button>
+        <button id="btn-remove-node" class="btn btn-danger btn-sm">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Link editor -->
+    <div id="panel-link-editor" class="hidden sidebar-section flex-1 overflow-y-auto panel-fade">
+      <div class="sidebar-title">Propriétés du lien</div>
+      <input type="hidden" id="edit-link-id" />
+      <div class="space-y-2">
+        <div>
+          <label class="field-label">Depuis — <span id="edit-link-src-label" class="text-blue-300"></span></label>
+          <select id="edit-link-src-iface" class="field-input"><!-- filled by JS --></select>
+        </div>
+        <div>
+          <label class="field-label">Vers — <span id="edit-link-dst-label" class="text-blue-300"></span></label>
+          <select id="edit-link-dst-iface" class="field-input"><!-- filled by JS --></select>
+        </div>
+      </div>
+      <div class="flex gap-2 mt-3">
+        <button id="btn-save-link" class="btn btn-primary btn-sm flex-1">Appliquer</button>
+        <button id="btn-remove-link" class="btn btn-danger btn-sm">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ─── CANVAS ─── -->
+  <main id="canvas-wrap">
+    <!-- Canvas toolbar -->
+    <div id="canvas-toolbar">
+      <span class="text-xs text-slate-500">
+        Glissez les nœuds · Clic = sélect · <strong class="text-slate-400">Clic droit</strong> sur un nœud = lien / supprimer
+      </span>
+      <div class="ml-auto flex items-center gap-1.5">
+        <!-- Import YAML -->
+        <button onclick="importYaml()"
+          class="btn btn-ghost btn-sm" title="Importer une topologie ContainerLab depuis un fichier YAML">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+          </svg>
+          Import YAML
+        </button>
+        <div class="w-px h-4 bg-slate-700"></div>
+        <!-- Zoom controls -->
+        <button onclick="AppState.cy?.zoom(AppState.cy.zoom()*1.2)"
+          class="btn btn-ghost btn-sm" title="Zoom +">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"/>
+          </svg>
+        </button>
+        <button onclick="AppState.cy?.zoom(AppState.cy.zoom()*.85)"
+          class="btn btn-ghost btn-sm" title="Zoom -">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM7 10h6"/>
+          </svg>
+        </button>
+        <button onclick="AppState.cy?.fit(undefined, 40)"
+          class="btn btn-ghost btn-sm" title="Ajuster la vue">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Cytoscape canvas -->
+    <div id="cy-canvas"></div>
+
+    <!-- Node context menu (right-click) -->
+    <div id="node-context-menu"
+      class="hidden absolute z-50 min-w-[160px] rounded border border-slate-600 bg-slate-800 shadow-xl text-xs py-1"
+      style="pointer-events: auto;">
+      <button onclick="ctxMenuStartLink()"
+        class="flex items-center gap-2 w-full px-3 py-2 text-left text-slate-200 hover:bg-slate-700 transition-colors">
+        <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+        </svg>
+        Créer un lien depuis ce nœud
+      </button>
+      <button onclick="ctxMenuDuplicateNode()"
+        class="flex items-center gap-2 w-full px-3 py-2 text-left text-slate-200 hover:bg-slate-700 transition-colors">
+        <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        </svg>
+        Dupliquer ce nœud
+      </button>
+      <hr class="border-slate-700 my-1">
+      <button onclick="ctxMenuDeleteNode()"
+        class="flex items-center gap-2 w-full px-3 py-2 text-left text-red-400 hover:bg-red-900/30 transition-colors">
+        <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6"/>
+        </svg>
+        Supprimer ce nœud
+      </button>
+    </div>
+
+  </main>
+
+  <!-- ─── RESIZE HANDLE ─── -->
+  <div id="right-resize-handle" title="Glisser pour redimensionner"></div>
+
+  <!-- ─── RIGHT SIDEBAR ─── -->
+  <aside id="sidebar-right">
+    <!-- Collapse toggle -->
+    <div id="right-collapse-btn-wrap">
+      <button id="btn-right-collapse"
+        class="text-slate-500 hover:text-slate-200 transition-colors px-1 py-0.5 rounded text-xs"
+        title="Réduire / élargir le panneau droit">
+        <!-- Arrow updated by JS -->
+        <svg id="right-collapse-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Tabs -->
+    <div id="right-tabs">
+      <button class="tab-btn active" data-tab="tab-yaml">YAML</button>
+      <button class="tab-btn" data-tab="tab-actions">Actions</button>
+    </div>
+
+    <!-- YAML tab -->
+    <div id="tab-yaml" class="tab-pane active flex-col">
+      <div class="flex items-center justify-between px-2 py-1.5 border-b border-slate-800">
+        <span class="text-xs text-slate-500">Aperçu containerlab</span>
+        <div class="flex items-center gap-2">
+          <button id="btn-commit-to-lab" class="btn btn-sm hidden"
+            style="border-color:#0369a1;color:#7dd3fc;" title="Enregistrer le YAML dans le lab source">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+            </svg>
+            Commit au Lab
+          </button>
+          <button id="btn-download-yaml" class="btn btn-ghost btn-sm" disabled title="Télécharger le YAML">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            Exporter
+          </button>
+        </div>
+      </div>
+      <!-- Source lab banner: shown when opened from sandbox YAML modal -->
+      <div id="source-lab-banner" class="hidden text-xs px-3 py-2 bg-sky-900/30 border-b border-sky-800/50 text-sky-300 flex items-center justify-between">
+        <span id="source-lab-banner-text"></span>
+        <span id="commit-feedback" class="text-xs"></span>
+      </div>
+      <!-- Commit deployment log panel -->
+      <div id="commit-steps-panel" class="hidden border-b border-slate-700/60 bg-slate-900/70 px-3 py-2 space-y-2">
+        <div class="flex items-center justify-between">
+          <span id="commit-steps-title" class="text-xs font-medium text-sky-300">Commit au Lab</span>
+          <button onclick="onCommitCancel()" class="text-slate-500 hover:text-slate-300 text-xs leading-none px-1">✕</button>
+        </div>
+        <div id="commit-steps-list" class="space-y-1 max-h-48 overflow-y-auto"></div>
+        <div id="commit-steps-actions" class="hidden flex gap-2 pt-1">
+          <button id="btn-commit-confirm" onclick="onCommitConfirm()"
+            class="btn btn-sm" style="border-color:#0369a1;color:#7dd3fc;">
+            Confirmer le déploiement
+          </button>
+          <button onclick="onCommitCancel()" class="btn btn-ghost btn-sm">Annuler</button>
+        </div>
+      </div>
+      <div id="yaml-errors" class="hidden text-xs text-red-300 bg-red-900/20 border border-red-800/40 rounded mx-2 mt-2 px-3 py-2 leading-relaxed"></div>
+      <pre id="yaml-preview" class="text-xs"># Définissez un lab et ajoutez des nœuds...</pre>
+    </div>
+
+    <!-- Actions tab -->
+    <div id="tab-actions" class="tab-pane flex-col p-3 gap-3">
+
+      <!-- VM confirmation -->
+      <div class="bg-slate-800/50 border border-slate-700 rounded p-3">
+        <div class="text-xs text-slate-400 mb-2 font-medium">VM de déploiement</div>
+        <div id="vm-deploy-status" class="text-xs text-slate-500">
+          Aucune VM sélectionnée
+        </div>
+      </div>
+
+      <!-- Sandbox creation -->
+      <div class="flex flex-col gap-2">
+        <div class="text-xs text-slate-400 font-medium">Créer comme Sandbox</div>
+        <p class="text-xs text-slate-500 leading-relaxed">
+          Soumet le YAML généré sur la VM sélectionnée comme topologie sandbox.
+          Le lab sera créé mais non démarré.
+        </p>
+        <div id="sandbox-result"
+          class="hidden text-xs text-green-300 bg-green-900/20 border border-green-800/40 rounded px-3 py-2">
+        </div>
+        <button id="btn-create-sandbox" class="btn btn-success w-full" disabled>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14
+                 m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+          Créer le Lab Sandbox
+        </button>
+      </div>
+
+      <!-- Stats -->
+      <div class="mt-auto bg-slate-800/30 border border-slate-700/50 rounded p-2">
+        <div class="text-xs text-slate-500 space-y-1">
+          <div class="flex justify-between">
+            <span>Nœuds :</span>
+            <span id="stat-nodes" class="text-slate-300 font-mono">0</span>
+          </div>
+          <div class="flex justify-between">
+            <span>Liens :</span>
+            <span id="stat-links" class="text-slate-300 font-mono">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+</div>
+
+<!-- ════════════════════ IMPORT YAML MODAL ════════════════════ -->
+<div id="modal-import-yaml"
+  class="hidden fixed inset-0 z-50 flex items-center justify-center">
+  <!-- Backdrop -->
+  <div class="absolute inset-0 bg-black/60" onclick="closeImportModal()"></div>
+  <!-- Dialog -->
+  <div class="relative bg-slate-800 border border-slate-600 rounded-lg shadow-2xl w-[700px] max-w-[95vw] max-h-[90vh] flex flex-col">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+      <div class="flex items-center gap-2">
+        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+        <h2 class="text-sm font-semibold text-slate-100">Importer une topologie ContainerLab</h2>
+      </div>
+      <button onclick="closeImportModal()"
+        class="text-slate-400 hover:text-white transition-colors text-lg leading-none">&times;</button>
+    </div>
+    <!-- Info -->
+    <div class="px-4 py-2.5 text-xs text-slate-400 bg-slate-900/50 border-b border-slate-800">
+      Collez le contenu d'un fichier YAML ContainerLab. Les nœuds, images et connexions seront reconstruits dans le canvas.
+    </div>
+    <!-- Textarea -->
+    <div class="flex-1 overflow-auto p-4">
+      <textarea id="import-yaml-text"
+        class="w-full h-72 min-h-[200px] bg-slate-900 border border-slate-600 rounded p-3 text-xs font-mono text-green-300 outline-none focus:border-blue-500 resize-y leading-relaxed"
+        placeholder="# Collez votre topologie ContainerLab ici...
+name: mon-lab
+mgmt:
+  network: clab-mgmt
+  ipv4_subnet: 172.20.20.0/24
+topology:
+  nodes:
+    R1:
+      kind: cisco_xrd
+      image: registry/xrd:7.9.1
+      mgmt_ipv4: 172.20.20.11
+    R2:
+      kind: juniper_vmx
+      image: registry/vmx:21.2
+  links:
+    - endpoints: [&quot;R1:ge-0/0/0&quot;, &quot;R2:xe-0/0/0&quot;]"></textarea>
+    </div>
+    <!-- Error -->
+    <div id="import-yaml-err"
+      class="hidden mx-4 mb-2 text-xs text-red-300 bg-red-900/20 border border-red-800/40 rounded px-3 py-2 leading-relaxed"></div>
+    <!-- Footer -->
+    <div class="flex items-center justify-between px-4 py-3 border-t border-slate-700">
+      <span class="text-xs text-slate-500">La topologie actuelle sera remplacée si le canvas n'est pas vide.</span>
+      <div class="flex items-center gap-2">
+        <button onclick="closeImportModal()" class="btn btn-ghost btn-sm">Annuler</button>
+        <button onclick="loadFromYamlText()" class="btn btn-primary btn-sm">
+          <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M5 13l4 4L19 7"/>
+          </svg>
+          Charger la topologie
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<!-- ════════════════════════════ SCRIPTS ════════════════════════════ -->
+<script>
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab)?.classList.add('active');
+
+    // Update VM deploy status label when switching to Actions tab
+    if (btn.dataset.tab === 'tab-actions') {
+      const vm = AppState?.selectedVm;
+      const el = document.getElementById('vm-deploy-status');
+      if (el) el.textContent = vm
+        ? `${vm.name} (${vm.id}) — ${vm.management_subnet || 'subnet ?'}`
+        : 'Aucune VM sélectionnée';
+    }
+  });
+});
+
+// Stats update hook (called from topology-builder.js via updateYamlPreview)
+const _origUpdateYaml = typeof updateYamlPreview !== 'undefined' ? updateYamlPreview : null;
+function _updateStats() {
+  const sn = document.getElementById('stat-nodes');
+  const sl = document.getElementById('stat-links');
+  if (sn) sn.textContent = AppState?.nodes?.length ?? 0;
+  if (sl) sl.textContent = AppState?.links?.length ?? 0;
+}
+</script>
+<script src="/static/js/topology-builder.js?v={{ topo_js_version }}"></script>
+<script>
+// Patch updateYamlPreview to also update stats
+const _baseUpdateYaml = updateYamlPreview;
+// Override post-load
+window.addEventListener('DOMContentLoaded', () => {}, { once: true });
+
+// Right panel: resize + collapse
+(function () {
+  const LS_WIDTH     = 'topo_right_width';
+  const LS_COLLAPSED = 'topo_right_collapsed';
+  const sidebar  = document.getElementById('sidebar-right');
+  const handle   = document.getElementById('right-resize-handle');
+  const btn      = document.getElementById('btn-right-collapse');
+  const icon     = document.getElementById('right-collapse-icon');
+  const ARROW_RIGHT = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>';
+  const ARROW_LEFT  = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>';
+
+  function setCollapsed(collapsed) {
+    if (collapsed) {
+      sidebar.classList.add('collapsed');
+      handle.style.display = 'none';
+      icon.innerHTML = ARROW_LEFT;
+    } else {
+      sidebar.classList.remove('collapsed');
+      handle.style.display = '';
+      icon.innerHTML = ARROW_RIGHT;
+    }
+    localStorage.setItem(LS_COLLAPSED, collapsed ? '1' : '0');
+  }
+
+  // Restore saved width
+  const savedWidth = parseInt(localStorage.getItem(LS_WIDTH) || '0', 10);
+  if (savedWidth >= 180 && savedWidth <= 700) sidebar.style.width = savedWidth + 'px';
+
+  // Restore collapsed state
+  if (localStorage.getItem(LS_COLLAPSED) === '1') setCollapsed(true);
+  else icon.innerHTML = ARROW_RIGHT;
+
+  btn.addEventListener('click', () => setCollapsed(!sidebar.classList.contains('collapsed')));
+
+  // Drag-to-resize
+  let startX = 0, startW = 0;
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault();
+    startX = e.clientX;
+    startW = sidebar.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+
+    function onMove(e) {
+      const delta = startX - e.clientX;   // dragging left = larger panel
+      const newW = Math.max(180, Math.min(700, startW + delta));
+      sidebar.style.width = newW + 'px';
+    }
+    function onUp() {
+      handle.classList.remove('dragging');
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      localStorage.setItem(LS_WIDTH, sidebar.offsetWidth);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      // Notify Cytoscape to refit after resize
+      setTimeout(() => AppState?.cy?.resize(), 50);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+})();
+</script>
+</body>
+</html>

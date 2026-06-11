@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Lint central
+        run: ruff check central/src/
+
+      - name: Lint vm-agent
+        run: ruff check vm-agent/src/
+
+  health-check-central:
+    name: Health check — Central
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install central dependencies
+        working-directory: central
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r requirements.txt
+
+      - name: Start central (background)
+        working-directory: central
+        env:
+          CENTRAL_CONFIG: config.yaml
+          CENTRAL_LOG_LEVEL: WARNING
+        run: |
+          cp config.yaml.example config.yaml 2>/dev/null || true
+          .venv/bin/uvicorn src.app:app --host 127.0.0.1 --port 8080 &
+          echo $! > /tmp/central.pid
+          sleep 5
+
+      - name: Health check
+        run: |
+          curl -fsS http://127.0.0.1:8080/health || (echo "Health check failed"; kill $(cat /tmp/central.pid) 2>/dev/null; exit 1)
+          echo "Health check passed"
+          kill $(cat /tmp/central.pid) 2>/dev/null || true
+
+  health-check-agent:
+    name: Health check — VM Agent
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install vm-agent dependencies
+        working-directory: vm-agent
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --upgrade pip
+          .venv/bin/pip install -r requirements.txt
+
+      - name: Start vm-agent (background)
+        working-directory: vm-agent
+        env:
+          VM_AGENT_TOKEN: ci-test-token
+          VM_AGENT_LOG_LEVEL: WARNING
+        run: |
+          .venv/bin/uvicorn src.agent:app --host 127.0.0.1 --port 8081 &
+          echo $! > /tmp/agent.pid
+          sleep 5
+
+      - name: Health check
+        run: |
+          curl -fsS http://127.0.0.1:8081/health || (echo "Health check failed"; kill $(cat /tmp/agent.pid) 2>/dev/null; exit 1)
+          echo "Health check passed"
+          kill $(cat /tmp/agent.pid) 2>/dev/null || true

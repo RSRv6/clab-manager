@@ -1,0 +1,25 @@
+central:
+  refresh_seconds: 3
+
+auth:
+  session_secret: CHANGE_ME_GENERATE_A_RANDOM_SECRET_KEY_32_CHARS
+  users_file: data/users.json
+  audit_file: data/audit.log.jsonl
+
+agents:
+  - id: vm1
+    name: clab-vm-01
+    ip: 192.168.1.101
+    port: 8081
+    token: CHANGE_ME_GENERATE_RANDOM_TOKEN_32_CHARS
+    base_url: http://192.168.1.101:8081
+    management_subnet: 172.20.0.0/16
+    ssh_user: clab-user
+  - id: vm2
+    name: clab-vm-02
+    ip: 192.168.1.102
+    port: 8081
+    token: CHANGE_ME_GENERATE_RANDOM_TOKEN_32_CHARS
+    base_url: http://192.168.1.102:8081
+    management_subnet: 172.21.0.0/16
+    ssh_user: clab-user

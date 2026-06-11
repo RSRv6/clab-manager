@@ -1,0 +1,5 @@
+agent:
+  name: "clab-vm-01"
+  host: "0.0.0.0"
+  port: 8081
+  api_token: "CHANGE_ME_GENERATE_RANDOM_TOKEN_32_CHARS"

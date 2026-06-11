@@ -1,0 +1,8 @@
+# Format: id,name,ip,token,port[,ssh_user]
+vm1,clab-vm-01,192.168.1.101,CHANGE_ME_TOKEN_VM1,8081,clab-user
+vm2,clab-vm-02,192.168.1.102,CHANGE_ME_TOKEN_VM2,8081,clab-user
+vm3,clab-vm-03,192.168.1.103,CHANGE_ME_TOKEN_VM3,8081,clab-user
+vm4,clab-vm-04,192.168.1.104,CHANGE_ME_TOKEN_VM4,8081,clab-user
+vm5,clab-vm-05,192.168.1.105,CHANGE_ME_TOKEN_VM5,8081,clab-user
+vm6,clab-vm-06,192.168.1.106,CHANGE_ME_TOKEN_VM6,8081,clab-user
+vm7,clab-vm-07,192.168.1.107,CHANGE_ME_TOKEN_VM7,8081,clab-user

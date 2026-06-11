@@ -1,0 +1,29 @@
+vlm_repo_url: "git@github.com:YOUR_ORG/virtual-labs-management.git"
+vlm_branch: "main"
+vlm_sync_mode: "pull"
+vlm_app_dir: "/opt/virtual-labs-management"
+vlm_app_user: "clab-user"
+
+central_service_name: "vlm-central"
+central_host: "0.0.0.0"
+central_port: 80
+central_config_path: "{{ vlm_app_dir }}/central/config.yaml"
+central_log_dir: "{{ vlm_app_dir }}/log"
+central_log_level: "INFO"
+central_tls_cert: ""
+central_tls_key: ""
+central_force_https: false
+central_bootstrap_admin_password: ""
+central_allow_insecure_session_secret: false
+central_allow_insecure_default_admin_password: false
+central_healthcheck_scheme: "{{ 'https' if central_tls_cert and central_tls_key else 'http' }}"
+central_healthcheck_url: "{{ central_healthcheck_scheme }}://127.0.0.1:{{ central_port }}/health"
+
+agent_service_name: "vlm-agent"
+agent_host: "0.0.0.0"
+agent_port: 8081
+agent_config_path: "{{ vlm_app_dir }}/vm-agent/config.yaml"
+agent_log_dir: "{{ vlm_app_dir }}/log"
+agent_log_level: "INFO"
+agent_allow_insecure_no_token: false
+agent_healthcheck_url: "http://127.0.0.1:{{ agent_port }}/health"

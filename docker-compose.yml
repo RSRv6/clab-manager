@@ -1,0 +1,39 @@
+# NOTE: Le déploiement de production utilise systemd + virtualenv (voir deployment/).
+# Ce fichier permet un démarrage local rapide pour le développement.
+#
+# Variables d'environnement attendues (fichier .env ou export) :
+#   CENTRAL_CONFIG   = chemin vers central/config.yaml  (défaut : config.yaml)
+#   AGENT_CONFIG     = chemin vers vm-agent/config.yaml (défaut : config.yaml)
+#   CENTRAL_LOG_DIR  = répertoire des logs du central   (défaut : dérivé du répertoire d'installation)
+
+version: '3.8'
+
+services:
+  central:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      bash -c "pip install -r requirements.txt -q &&
+               uvicorn src.app:app --host 0.0.0.0 --port 80"
+    ports:
+      - "80:80"
+    volumes:
+      - ./central:/app
+    environment:
+      - CENTRAL_CONFIG=/app/config.yaml
+      - CENTRAL_LOG_DIR=/app/../log
+    restart: unless-stopped
+
+  vm-agent:
+    image: python:3.11-slim
+    working_dir: /agent
+    command: >
+      bash -c "pip install -r requirements.txt -q &&
+               uvicorn src.agent:app --host 0.0.0.0 --port 8081"
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./vm-agent:/agent
+    environment:
+      - AGENT_CONFIG=/agent/config.yaml
+    restart: unless-stopped

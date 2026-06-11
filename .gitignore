@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Données persistantes (ne jamais committer)
+central/data/*.db
+central/data/*.db-*
+central/data/*.db.*
+central/data/*.jsonl
+central/data/users.json
+
+# Secrets
+.env
+*.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Runtime generated
+central/data/local_dns.hosts
+log/
+
+# OS
+.DS_Store
+Thumbs.db
