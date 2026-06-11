@@ -430,6 +430,12 @@ pytest tests/
 
 MIT License — see [LICENSE](LICENSE).
 
+## Language
+
+The UI is currently in **French**. The codebase, README, and API are in English.
+
+Contributions to add i18n support or an English translation are welcome — feel free to open an issue to discuss the approach.
+
 ## Contributing
 
 Pull requests welcome. Please open an issue first to discuss significant changes.
