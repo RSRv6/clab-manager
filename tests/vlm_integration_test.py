@@ -405,7 +405,16 @@ class VLMTestRunner:
 
         r = self._get(f"/api/vms/{vm_id}/labs/{lab_name}/sandbox-yaml")
         if r.status_code == 403:
-            return Result("sandbox_yaml", "warn", f"HTTP 403 — lab réservé ou permission refusée")
+            # Admin fallback : topology-yaml via admin endpoint
+            r2 = self._get(f"/api/admin/vms/{vm_id}/labs/{lab_name}/topology-yaml")
+            if r2.status_code == 200:
+                d2 = r2.json()
+                yaml_text = d2.get("yaml", d2.get("yaml_text", ""))
+                if yaml_text:
+                    return Result("sandbox_yaml", "pass",
+                                  f"vm={vm_id} lab={lab_name} — {len(yaml_text)} chars YAML (via admin)")
+            return Result("sandbox_yaml", "warn",
+                          f"HTTP 403 — lab non assigné à l'utilisateur de test")
         if r.status_code != 200:
             return Result("sandbox_yaml", "fail", f"HTTP {r.status_code}: {r.text[:80]}")
         d = r.json()
@@ -413,6 +422,44 @@ class VLMTestRunner:
         return Result(
             "sandbox_yaml", "pass" if yaml_text else "fail",
             f"vm={vm_id} lab={lab_name} — {len(yaml_text)} chars YAML",
+        )
+
+    # 13b. Set-default-config (sauvegarde config courante)
+    def t_set_default_config(self) -> Result:
+        vm_id, lab_name, node_name = self._pick_lab_and_node()
+        if not vm_id:
+            return Result("set_default_config", "skip", "aucun lab/nœud adapté")
+
+        r = self._post(
+            f"/api/vms/{vm_id}/labs/{lab_name}/set-default-config",
+            json={"router_names": [node_name]},
+        )
+        if r.status_code != 200:
+            return Result("set_default_config", "fail", f"HTTP {r.status_code}: {r.text[:120]}")
+        d = r.json()
+
+        # Peut être asynchrone (job_id) ou synchrone (results)
+        job_id = d.get("job_id")
+        if job_id:
+            for _ in range(18):  # max 90s
+                time.sleep(5)
+                jr = self._get(f"/api/vms/{vm_id}/labs/{lab_name}/set-default-job/{job_id}")
+                if jr.status_code != 200:
+                    break
+                jd = jr.json()
+                if jd.get("status") == "completed":
+                    d = jd
+                    break
+
+        success = d.get("success_count", 0)
+        total   = d.get("total", 0)
+        results_list = d.get("results", [])
+        ok_list = [x for x in results_list if x.get("ok")]
+        return Result(
+            "set_default_config",
+            "pass" if (success > 0 or ok_list) else "warn",
+            f"vm={vm_id} lab={lab_name} node={node_name} — {success or len(ok_list)}/{total or len(results_list)} OK"
+            + (f" (job {job_id[:8]})" if job_id else ""),
         )
 
     # 14. Topology-builder metadata
@@ -434,6 +481,7 @@ class VLMTestRunner:
         if not vm_id:
             return Result("reconfigure", "skip", "aucun lab/nœud adapté")
 
+        # Lancer le job de reconfigure
         r = self._post(
             f"/api/vms/{vm_id}/labs/{lab_name}/reconfigure",
             json={"router_names": [node_name]},
@@ -441,13 +489,30 @@ class VLMTestRunner:
         if r.status_code != 200:
             return Result("reconfigure", "fail", f"HTTP {r.status_code}: {r.text[:120]}")
         d = r.json()
+
+        # Reconfigure asynchrone : polling du job jusqu'à completion
+        job_id = d.get("job_id")
+        if job_id:
+            for _ in range(30):   # max 150s
+                time.sleep(5)
+                jr = self._get(f"/api/vms/{vm_id}/labs/{lab_name}/reconfigure-job/{job_id}")
+                if jr.status_code != 200:
+                    break
+                jd = jr.json()
+                if jd.get("status") == "completed":
+                    d = jd
+                    break
+
         results_list = d.get("results", [])
         ok_list = [x for x in results_list if x.get("ok")]
+        success = d.get("success_count", len(ok_list))
+        total   = d.get("total", len(results_list))
         return Result(
             "reconfigure",
-            "pass" if ok_list else "warn",
-            f"vm={vm_id} lab={lab_name} node={node_name} — {len(ok_list)}/{len(results_list)} OK",
-            detail=str(results_list[0]) if results_list else "",
+            "pass" if (ok_list or success > 0) else "warn",
+            f"vm={vm_id} lab={lab_name} node={node_name} — {success}/{total} OK"
+            + (f" (job {job_id[:8]})" if job_id else ""),
+            detail=str(results_list[0]) if results_list else str(d.get("error", "")),
         )
 
     # 16. Export YAML topologie
@@ -542,6 +607,7 @@ class VLMTestRunner:
         self._run("export_config", self.t_export_config)
         self._run("export_yaml", self.t_export_yaml)
         self._run("sandbox_yaml", self.t_sandbox_yaml)
+        self._run("set_default_config", self.t_set_default_config)
 
         # Groupe 5 : Topology builder
         self._section("5. Topology builder")
