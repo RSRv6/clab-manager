@@ -2,7 +2,7 @@
 set -euo pipefail
 
 APP_DIR="/opt/virtual-labs-management"
-APP_USER="root"
+APP_USER="vlm-central"
 AGENT_HOST="0.0.0.0"
 AGENT_PORT="8081"
 AGENT_CONFIG=""
@@ -11,6 +11,7 @@ AGENT_LOG_DIR=""
 AGENT_LOG_LEVEL="INFO"
 AGENT_ALLOW_INSECURE_NO_TOKEN="false"
 SERVICE_NAME="vlm-agent"
+LAB_CONFIG_DB_ROOT=""
 
 CONFIG_PROVIDED="false"
 LOG_DIR_PROVIDED="false"
@@ -30,6 +31,7 @@ while [[ $# -gt 0 ]]; do
     --service-name) SERVICE_NAME="$2"; shift 2 ;;
     --token) AGENT_TOKEN="$2"; shift 2 ;;
     --agent-name) AGENT_NAME="$2"; shift 2 ;;
+    --lab-config-db-root) LAB_CONFIG_DB_ROOT="$2"; shift 2 ;;
     *) echo "Unknown argument: $1"; exit 1 ;;
   esac
 done
@@ -43,6 +45,24 @@ if [[ "$LOG_DIR_PROVIDED" == "false" ]]; then
 fi
 
 install -d -m 0755 /etc/default /etc/systemd/system "$AGENT_LOG_DIR" "$(dirname "$AGENT_CONFIG")" "$(dirname "$PERSISTENT_AGENT_CONFIG")"
+
+# Ensure the service user exists and is in the docker group (required for clab/docker access)
+if id "$APP_USER" &>/dev/null; then
+  usermod -aG docker "$APP_USER" 2>/dev/null && echo "Added $APP_USER to docker group" || true
+else
+  echo "WARNING: user $APP_USER does not exist — service may fail to start"
+fi
+
+# Set ownership of the log directory to the service user
+chown "$APP_USER":"$APP_USER" "$AGENT_LOG_DIR" 2>/dev/null || true
+
+# Derive default LAB_CONFIG_DB_ROOT from service user home if not provided
+if [[ -z "$LAB_CONFIG_DB_ROOT" ]]; then
+  USER_HOME=$(getent passwd "$APP_USER" | cut -d: -f6)
+  LAB_CONFIG_DB_ROOT="${USER_HOME}/labs/config_db"
+fi
+# Ensure the directory exists and belongs to the service user
+install -d -m 0755 -o "$APP_USER" -g "$APP_USER" "$LAB_CONFIG_DB_ROOT" 2>/dev/null || true
 
 # Create the config file if it does not exist yet (regardless of CONFIG_PROVIDED,
 # because the file may simply not be present on a fresh machine).
@@ -69,6 +89,7 @@ AGENT_CONFIG=$AGENT_CONFIG
 VM_AGENT_LOG_DIR=$AGENT_LOG_DIR
 VM_AGENT_LOG_LEVEL=$AGENT_LOG_LEVEL
 AGENT_ALLOW_INSECURE_NO_TOKEN=$AGENT_ALLOW_INSECURE_NO_TOKEN
+LAB_CONFIG_DB_ROOT=$LAB_CONFIG_DB_ROOT
 EOF
 
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
