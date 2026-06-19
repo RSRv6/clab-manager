@@ -2035,11 +2035,19 @@ def _resolve_lab_db_dir(lab_name: str, topology_file: str | None = None) -> str:
             candidate_topologies.append(Path.cwd() / topo_path)
 
         for candidate in candidate_topologies:
-            if candidate.exists():
+            try:
+                exists = candidate.exists()
+            except OSError:
+                exists = False
+            if exists:
                 return str(candidate.parent / "config_db" / lab_name)
 
-        # Even if the file is not present yet, keep the expected layout.
-        return str(topo_path.parent / "config_db" / lab_name)
+        # Use topology-relative fallback only if the parent dir is accessible.
+        try:
+            topo_path.parent.stat()
+            return str(topo_path.parent / "config_db" / lab_name)
+        except OSError:
+            pass  # topology is in an inaccessible path (e.g. another user's home)
 
     root = _resolve_db_root()
     return os.path.join(root, lab_name)
