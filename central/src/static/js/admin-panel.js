@@ -179,6 +179,8 @@ function renderAdminVMs(items) {
         const vmToken = String(vm.token || "");
         const vmBaseUrl = String(vm.base_url || `http://${vmIp}:${vmPort}`);
         const vmManagementSubnet = String(vm.management_subnet || "").trim();
+        const usesClabApi = Boolean(vm.use_clab_api_server);
+        const clabApiUrl = String(vm.clab_api_base_url || "");
         const isClab = isClabVm(vm);
         const metricsId = vmMetricsElementId(vmId);
         const vmInventory = inventoryByVmId.get(vmId) || { error: "", topologies: [] };
@@ -252,6 +254,17 @@ function renderAdminVMs(items) {
                         <p class="text-xs text-slate-400 mt-1">${escapeHtml(vmId)} · ${escapeHtml(vmIp)}:${escapeHtml(vmPort)}</p>
                         <p class="text-[11px] mt-1 text-slate-500">${escapeHtml(vmBaseUrl)}</p>
                         ${vmManagementSubnet ? `<p class="text-[11px] mt-1 text-amber-300">Subnet mgmt: ${escapeHtml(vmManagementSubnet)}</p>` : ""}
+                        <p class="text-[11px] mt-1.5">
+                            ${usesClabApi
+                                ? `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border border-cyan-700/60 bg-cyan-900/20 text-cyan-300">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 inline-block"></span>clab-api-server
+                                   </span>
+                                   ${clabApiUrl ? `<span class="ml-1 text-slate-500">${escapeHtml(clabApiUrl)}</span>` : ""}`
+                                : `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border border-slate-700 bg-slate-800/30 text-slate-500">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-slate-600 inline-block"></span>vm-agent only
+                                   </span>`
+                            }
+                        </p>
                         ${fullAdmin ? `<p class="text-[11px] mt-1 text-amber-300">Token: ${escapeHtml(maskToken(vmToken))}</p>` : ""}
                     </div>
                     <div class="flex items-center gap-2">

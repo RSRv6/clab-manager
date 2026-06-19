@@ -27,7 +27,9 @@ function showReconfigureSelectModal(vmId, labName, labKey, routers) {
 
     const routerCheckboxes = routers
         .map((router) => {
-            const shortName = String(router.name || "").split("-").pop() || router.name || "?";
+            const fullName = String(router.name || "");
+            const labPrefix = `clab-${labName}-`;
+            const shortName = fullName.startsWith(labPrefix) ? fullName.slice(labPrefix.length) : fullName || "?";
             const kind = String(router.kind || "").split("_").pop() || router.kind || "?";
             return `
                 <label class="flex items-center gap-2 rounded px-2 py-1.5 hover:bg-slate-800/50">

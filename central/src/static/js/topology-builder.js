@@ -615,9 +615,29 @@ function populateImageSelect(familyId, currentImage) {
   manualOpt.textContent = '-- Image personnalisée --';
   imgSel.appendChild(manualOpt);
 
-  // Use real docker images from the agent if available, else fall back to family defaults
+  // Use real docker images from the agent if available, filtered by family keywords.
+  // Fall back to static family defaults when docker images are not yet loaded.
+  const _familyKeywords = {
+    ios:    ['iol', 'iosv', 'csr', 'cisco_ios', 'vios', 'cisco-iol'],
+    iosxr:  ['xrd', 'xrv9k', 'xrv', 'iosxr'],
+    junos:  ['vmx', 'vsrx', 'vqfx', 'vevo', 'junos', 'juniper'],
+    crpd:   ['crpd'],
+    vjunos: ['vjunos'],
+    srl:    ['srlinux', 'srl'],
+    sros:   ['sros', 'vr-sros'],
+    ceos:   ['ceos', 'arista'],
+  };
+  const keywords = _familyKeywords[familyId] || [];
   const images = AppState.dockerImages.length > 0
-    ? AppState.dockerImages.map(img => ({ image: img.image, label: img.image }))
+    ? (() => {
+        const filtered = AppState.dockerImages.filter(img =>
+          keywords.length === 0 ||
+          keywords.some(kw => String(img.image || '').toLowerCase().includes(kw))
+        );
+        // If no match for this family, show all (better than empty)
+        const pool = filtered.length > 0 ? filtered : AppState.dockerImages;
+        return pool.map(img => ({ image: img.image, label: img.image }));
+      })()
     : imagesForFamily(familyId);
 
   images.forEach(img => {
